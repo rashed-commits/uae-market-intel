@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UAE Market Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <!-- Grain overlay -->
+    <div class="grain-overlay"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="header-left">
+                <div class="logo-group">
+                    <div class="logo-icon">
+                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="14" cy="14" r="3" fill="#D4A853"/>
+                            <circle cx="14" cy="14" r="7" stroke="#D4A853" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.7"/>
+                            <circle cx="14" cy="14" r="11" stroke="#D4A853" stroke-width="1" stroke-dasharray="4 4" opacity="0.4"/>
+                            <line x1="14" y1="1" x2="14" y2="5" stroke="#D4A853" stroke-width="1.5" opacity="0.5"/>
+                            <line x1="14" y1="23" x2="14" y2="27" stroke="#D4A853" stroke-width="1.5" opacity="0.5"/>
+                            <line x1="1" y1="14" x2="5" y2="14" stroke="#D4A853" stroke-width="1.5" opacity="0.5"/>
+                            <line x1="23" y1="14" x2="27" y2="14" stroke="#D4A853" stroke-width="1.5" opacity="0.5"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="logo-title">UAE Market Intel</div>
+                        <div class="logo-subtitle">Opportunity Intelligence Platform</div>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="live-badge">
+                    <span class="live-dot"></span>
+                    Live
+                </div>
+                <div class="last-updated" id="lastUpdated">Updated just now</div>
+                <button class="refresh-btn" onclick="refreshData()">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M1 7C1 3.686 3.686 1 7 1c1.9 0 3.606.84 4.77 2.175M13 7c0 3.314-2.686 6-6 6-1.9 0-3.606-.84-4.77-2.175" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        <path d="M11.5 1v2.5H9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2.5 10.5V13H5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-eyebrow">Market Intelligence</div>
+            <h1 class="hero-title">UAE Opportunity Radar</h1>
+            <p class="hero-desc">Real-time signals from Reddit, X, LinkedIn, Arabic forums, and review platforms — surfacing unmet needs and emerging trends before they peak.</p>
+        </div>
+        <div class="stat-row">
+            <div class="stat-card">
+                <div class="stat-value" id="statTotal">0</div>
+                <div class="stat-label">Total Signals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statHigh">0</div>
+                <div class="stat-label">High Priority</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statSectors">0</div>
+                <div class="stat-label">Sectors Tracked</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statPlatforms">0</div>
+                <div class="stat-label">Platforms Monitored</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <!-- Filters -->
+        <div class="filters-bar">
+            <div class="filters-left">
+                <div class="search-wrap">
+                    <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+                        <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search signals, keywords, topics..." oninput="applyFilters()">
+                </div>
+                <div class="filter-group" id="sectorFilters">
+                    <button class="filter-chip active" data-filter="all" onclick="setFilter('sector', 'all', this)">All Sectors</button>
+                </div>
+            </div>
+            <div class="filters-right">
+                <div class="filter-group" id="typeFilters">
+                    <button class="filter-chip active" data-filter="all" onclick="setFilter('type', 'all', this)">All Types</button>
+                    <button class="filter-chip" data-filter="trending" onclick="setFilter('type', 'trending', this)">Trending</button>
+                    <button class="filter-chip" data-filter="pain_point" onclick="setFilter('type', 'pain_point', this)">Pain Points</button>
+                    <button class="filter-chip" data-filter="opportunity" onclick="setFilter('type', 'opportunity', this)">Opportunities</button>
+                    <button class="filter-chip" data-filter="mention" onclick="setFilter('type', 'mention', this)">Mentions</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="feed" onclick="setTab('feed', this)">Signal Feed</button>
+            <button class="tab" data-tab="sectors" onclick="setTab('sectors', this)">By Sector</button>
+            <button class="tab" data-tab="platforms" onclick="setTab('platforms', this)">By Platform</button>
+        </div>
+
+        <!-- Tab: Signal Feed -->
+        <div class="tab-content active" id="tab-feed">
+            <div class="feed-grid" id="feedGrid">
+                <!-- Cards injected by JS -->
+            </div>
+        </div>
+
+        <!-- Tab: By Sector -->
+        <div class="tab-content" id="tab-sectors">
+            <div class="sectors-grid" id="sectorsGrid">
+            </div>
+        </div>
+
+        <!-- Tab: By Platform -->
+        <div class="tab-content" id="tab-platforms">
+            <div class="platforms-grid" id="platformsGrid">
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Detail Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModal()">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <line x1="3" y1="3" x2="15" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="15" y1="3" x2="3" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <div class="modal-body" id="modalBody">
+            </div>
+        </div>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>
