@@ -1,0 +1,293 @@
+{
+  "name": "UAE Market Intel — Analysis & Digest",
+  "nodes": [
+    {
+      "id": "b2c3d4e5-0001-4000-8000-000000000001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b2c3d4e5-0002-4000-8000-000000000002",
+      "name": "Read Raw Data Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 300],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Raw Data"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "b2c3d4e5-0003-4000-8000-000000000003",
+      "name": "Filter Last 24h & Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);\n\nconst recent = items.filter(item => {\n  const collected = new Date(item.json.collected_at);\n  return collected >= oneDayAgo;\n});\n\n// Batch into groups of 10 for GPT processing\nconst batches = [];\nfor (let i = 0; i < recent.length; i += 10) {\n  const batch = recent.slice(i, i + 10);\n  const posts = batch.map((item, idx) => ({\n    id: i + idx,\n    source: item.json.source,\n    title: item.json.title,\n    body: item.json.body?.substring(0, 500),\n    score: item.json.score,\n    url: item.json.url\n  }));\n  batches.push({ json: { posts, batch_index: Math.floor(i / 10) } });\n}\n\nreturn batches.length > 0 ? batches : [{ json: { posts: [], batch_index: 0 } }];"
+      }
+    },
+    {
+      "id": "b2c3d4e5-0004-4000-8000-000000000004",
+      "name": "Loop Over Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [980, 300],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "b2c3d4e5-0005-4000-8000-000000000005",
+      "name": "GPT-4o Analyze Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1240, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"temperature\": 0.3,\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a UAE market intelligence analyst. Analyze social media posts, news articles, and forum discussions from the UAE. For each post, extract structured insights. Return a JSON object with an 'insights' array. Each insight object must have: pain_point (string, the frustration or problem expressed, or empty), unmet_need (string, what the person wishes existed, or empty), sector (one of: Food & Beverage, Fintech, Healthcare, Real Estate, Retail, Education, Logistics, Tourism, Other), sentiment (positive/negative/neutral), opportunity_signal (high/medium/low), language (Arabic/English based on original content), summary (1-2 sentence summary of the key insight), source_url (from input). Focus on UAE-specific market signals. Ignore generic complaints not related to business opportunities.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyze these posts from UAE platforms:\\n\\n{{ JSON.stringify($json.posts) }}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "openai-header-auth",
+          "name": "OpenAI API Key"
+        }
+      }
+    },
+    {
+      "id": "b2c3d4e5-0006-4000-8000-000000000006",
+      "name": "Wait 2 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1500, 300],
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "webhookId": "b2c3d4e5-wait-webhook-001"
+    },
+    {
+      "id": "b2c3d4e5-0007-4000-8000-000000000007",
+      "name": "Aggregate GPT Responses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 300],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst allInsights = [];\n\nfor (const item of items) {\n  try {\n    const content = item.json.choices?.[0]?.message?.content;\n    if (content) {\n      const parsed = JSON.parse(content);\n      if (parsed.insights) {\n        allInsights.push(...parsed.insights);\n      }\n    }\n  } catch (e) {\n    // Skip malformed responses\n  }\n}\n\n// Deduplicate and rank\nconst sectors = {};\nconst painPoints = [];\nconst opportunities = [];\nlet trendingTopics = {};\n\nfor (const insight of allInsights) {\n  // Count by sector\n  const sector = insight.sector || 'Other';\n  sectors[sector] = (sectors[sector] || 0) + 1;\n\n  // Collect pain points\n  if (insight.pain_point && insight.pain_point.trim()) {\n    painPoints.push({\n      description: insight.pain_point,\n      sector: sector,\n      sentiment: insight.sentiment,\n      signal: insight.opportunity_signal,\n      language: insight.language,\n      source_url: insight.source_url\n    });\n  }\n\n  // Collect opportunities\n  if (insight.opportunity_signal === 'high' || insight.unmet_need) {\n    opportunities.push({\n      need: insight.unmet_need || insight.pain_point,\n      sector: sector,\n      signal: insight.opportunity_signal,\n      summary: insight.summary,\n      language: insight.language,\n      source_url: insight.source_url\n    });\n  }\n\n  // Track trending topics by sector\n  const key = `${sector}: ${(insight.summary || '').substring(0, 50)}`;\n  trendingTopics[key] = (trendingTopics[key] || 0) + 1;\n}\n\n// Sort pain points by frequency\nconst painFreq = {};\npainPoints.forEach(p => {\n  const key = p.description.substring(0, 60);\n  painFreq[key] = (painFreq[key] || { ...p, count: 0 });\n  painFreq[key].count++;\n});\n\nconst rankedPainPoints = Object.values(painFreq)\n  .sort((a, b) => b.count - a.count)\n  .slice(0, 10);\n\nconst rankedOpportunities = opportunities\n  .filter(o => o.signal === 'high')\n  .slice(0, 5);\n\nconst topTrending = Object.entries(trendingTopics)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 3)\n  .map(([topic, count]) => ({ topic, mentions: count }));\n\nconst today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n\nreturn [{\n  json: {\n    date: today,\n    total_posts_analyzed: allInsights.length,\n    top_trending: topTrending,\n    pain_points: rankedPainPoints,\n    opportunities: rankedOpportunities,\n    sector_breakdown: sectors,\n    all_insights: allInsights\n  }\n}];"
+      }
+    },
+    {
+      "id": "b2c3d4e5-0008-4000-8000-000000000008",
+      "name": "Generate HTML Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2020, 300],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst sectorColors = {\n  'Food & Beverage': '#FB923C',\n  'Fintech': '#818CF8',\n  'Healthcare': '#FB7185',\n  'Real Estate': '#2DD4BF',\n  'Retail': '#C084FC',\n  'Education': '#60A5FA',\n  'Logistics': '#D4A853',\n  'Tourism': '#F472B6',\n  'Other': '#94A3B8'\n};\n\nlet trendingHtml = (data.top_trending || []).map((t, i) => `\n  <tr>\n    <td style=\"padding: 12px 16px; border-bottom: 1px solid #1E293B;\">\n      <span style=\"color: #D4A853; font-weight: 700; font-size: 18px;\">${i + 1}.</span>\n    </td>\n    <td style=\"padding: 12px 16px; border-bottom: 1px solid #1E293B;\">\n      <span style=\"color: #E2E8F0; font-weight: 600;\">${t.topic}</span>\n      <br><span style=\"color: #64748B; font-size: 12px;\">${t.mentions} mention${t.mentions > 1 ? 's' : ''}</span>\n    </td>\n  </tr>\n`).join('');\n\nlet painPointsHtml = (data.pain_points || []).map(p => `\n  <tr>\n    <td style=\"padding: 10px 16px; border-bottom: 1px solid #1E293B; color: #E2E8F0; font-size: 14px;\">\n      ${p.description}\n    </td>\n    <td style=\"padding: 10px 16px; border-bottom: 1px solid #1E293B;\">\n      <span style=\"background: ${sectorColors[p.sector] || '#94A3B8'}22; color: ${sectorColors[p.sector] || '#94A3B8'}; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;\">${p.sector}</span>\n    </td>\n    <td style=\"padding: 10px 16px; border-bottom: 1px solid #1E293B; color: #F43F5E; font-size: 13px; text-align: center;\">\n      ${p.count}x\n    </td>\n  </tr>\n`).join('');\n\nlet opportunitiesHtml = (data.opportunities || []).map(o => `\n  <div style=\"background: #131B2E; border: 1px solid #1E293B; border-left: 3px solid #D4A853; border-radius: 8px; padding: 16px; margin-bottom: 12px;\">\n    <div style=\"color: #E2E8F0; font-weight: 600; font-size: 14px; margin-bottom: 6px;\">${o.need}</div>\n    <div style=\"color: #94A3B8; font-size: 13px; margin-bottom: 8px;\">${o.summary || ''}</div>\n    <span style=\"background: ${sectorColors[o.sector] || '#94A3B8'}22; color: ${sectorColors[o.sector] || '#94A3B8'}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;\">${o.sector}</span>\n    <span style=\"background: rgba(212,168,83,0.15); color: #D4A853; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 6px;\">${(o.signal || '').toUpperCase()}</span>\n    ${o.language ? `<span style=\"background: rgba(45,212,191,0.12); color: #2DD4BF; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 6px;\">${o.language}</span>` : ''}\n  </div>\n`).join('');\n\nlet sectorBreakdownHtml = Object.entries(data.sector_breakdown || {})\n  .sort((a, b) => b[1] - a[1])\n  .map(([sector, count]) => `\n    <span style=\"display: inline-block; background: ${sectorColors[sector] || '#94A3B8'}15; color: ${sectorColors[sector] || '#94A3B8'}; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin: 3px;\">${sector}: ${count}</span>\n  `).join('');\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"></head>\n<body style=\"margin: 0; padding: 0; background: #0B1120; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\">\n  <div style=\"max-width: 640px; margin: 0 auto; padding: 24px;\">\n    \n    <!-- Header -->\n    <div style=\"text-align: center; padding: 32px 0 24px;\">\n      <div style=\"display: inline-block; background: rgba(212,168,83,0.15); border: 1px solid rgba(212,168,83,0.2); border-radius: 10px; padding: 10px; margin-bottom: 12px;\">\n        <span style=\"color: #D4A853; font-size: 24px;\">◎</span>\n      </div>\n      <h1 style=\"color: #E2E8F0; font-size: 22px; font-weight: 700; margin: 0 0 4px;\">UAE Market Intelligence</h1>\n      <p style=\"color: #64748B; font-size: 13px; margin: 0;\">Daily Intelligence Digest — ${data.date}</p>\n    </div>\n    \n    <!-- Stats Bar -->\n    <div style=\"background: #131B2E; border: 1px solid #1E293B; border-radius: 10px; padding: 16px; margin-bottom: 24px; text-align: center;\">\n      <span style=\"color: #D4A853; font-size: 24px; font-weight: 700;\">${data.total_posts_analyzed}</span>\n      <span style=\"color: #64748B; font-size: 13px; margin-left: 8px;\">signals analyzed</span>\n      <span style=\"color: #1E293B; margin: 0 12px;\">|</span>\n      <span style=\"color: #F43F5E; font-size: 24px; font-weight: 700;\">${(data.pain_points || []).length}</span>\n      <span style=\"color: #64748B; font-size: 13px; margin-left: 8px;\">pain points</span>\n      <span style=\"color: #1E293B; margin: 0 12px;\">|</span>\n      <span style=\"color: #2DD4BF; font-size: 24px; font-weight: 700;\">${(data.opportunities || []).length}</span>\n      <span style=\"color: #64748B; font-size: 13px; margin-left: 8px;\">opportunities</span>\n    </div>\n    \n    <!-- Section 1: Trending Topics -->\n    <div style=\"margin-bottom: 24px;\">\n      <h2 style=\"color: #D4A853; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 12px; font-weight: 700;\">⚡ Top Trending Topics</h2>\n      <table style=\"width: 100%; border-collapse: collapse; background: #131B2E; border: 1px solid #1E293B; border-radius: 10px;\">\n        ${trendingHtml || '<tr><td style=\"padding: 16px; color: #64748B; text-align: center;\">No trending topics today</td></tr>'}\n      </table>\n    </div>\n    \n    <!-- Section 2: Pain Points -->\n    <div style=\"margin-bottom: 24px;\">\n      <h2 style=\"color: #F43F5E; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 12px; font-weight: 700;\">🔴 Top Pain Points by Sector</h2>\n      <table style=\"width: 100%; border-collapse: collapse; background: #131B2E; border: 1px solid #1E293B; border-radius: 10px;\">\n        <tr style=\"border-bottom: 1px solid #1E293B;\">\n          <th style=\"padding: 10px 16px; color: #64748B; font-size: 12px; text-align: left; font-weight: 600;\">Pain Point</th>\n          <th style=\"padding: 10px 16px; color: #64748B; font-size: 12px; text-align: left; font-weight: 600;\">Sector</th>\n          <th style=\"padding: 10px 16px; color: #64748B; font-size: 12px; text-align: center; font-weight: 600;\">Freq</th>\n        </tr>\n        ${painPointsHtml || '<tr><td colspan=\"3\" style=\"padding: 16px; color: #64748B; text-align: center;\">No pain points detected</td></tr>'}\n      </table>\n    </div>\n    \n    <!-- Section 3: Opportunities -->\n    <div style=\"margin-bottom: 24px;\">\n      <h2 style=\"color: #2DD4BF; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 12px; font-weight: 700;\">⭐ Emerging Opportunities</h2>\n      ${opportunitiesHtml || '<div style=\"background: #131B2E; border: 1px solid #1E293B; border-radius: 8px; padding: 16px; color: #64748B; text-align: center;\">No high-signal opportunities today</div>'}\n    </div>\n    \n    <!-- Sector Breakdown -->\n    <div style=\"margin-bottom: 24px;\">\n      <h2 style=\"color: #94A3B8; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 12px; font-weight: 700;\">📊 Sector Breakdown</h2>\n      <div style=\"background: #131B2E; border: 1px solid #1E293B; border-radius: 10px; padding: 16px; text-align: center;\">\n        ${sectorBreakdownHtml || '<span style=\"color: #64748B;\">No data</span>'}\n      </div>\n    </div>\n    \n    <!-- Footer -->\n    <div style=\"text-align: center; padding: 24px 0; border-top: 1px solid #1E293B;\">\n      <p style=\"color: #475569; font-size: 12px; margin: 0;\">UAE Market Intelligence System — Abu Dhabi, UAE</p>\n      <p style=\"color: #334155; font-size: 11px; margin: 4px 0 0;\">Automated daily digest · Powered by n8n + GPT-4o</p>\n    </div>\n    \n  </div>\n</body>\n</html>\n`;\n\nreturn [{ json: { subject: `UAE Market Intelligence — ${data.date}`, html, date: data.date, total: data.total_posts_analyzed, all_insights: data.all_insights } }];"
+      }
+    },
+    {
+      "id": "b2c3d4e5-0009-4000-8000-000000000009",
+      "name": "Send Gmail Digest",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2280, 160],
+      "parameters": {
+        "operation": "send",
+        "sendTo": "rashed@aldhaheri.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-oauth",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "b2c3d4e5-0010-4000-8000-000000000010",
+      "name": "Write Insights to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2280, 440],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Insights"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            { "id": "pain_point", "displayName": "pain_point", "canBeUsedToMatch": false },
+            { "id": "unmet_need", "displayName": "unmet_need", "canBeUsedToMatch": false },
+            { "id": "sector", "displayName": "sector", "canBeUsedToMatch": false },
+            { "id": "sentiment", "displayName": "sentiment", "canBeUsedToMatch": false },
+            { "id": "opportunity_signal", "displayName": "opportunity_signal", "canBeUsedToMatch": false },
+            { "id": "language", "displayName": "language", "canBeUsedToMatch": false },
+            { "id": "summary", "displayName": "summary", "canBeUsedToMatch": false },
+            { "id": "source_url", "displayName": "source_url", "canBeUsedToMatch": false }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "b2c3d4e5-0011-4000-8000-000000000011",
+      "name": "Expand Insights for Sheet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2040, 440],
+      "parameters": {
+        "jsCode": "// Expand all_insights array into individual items for sheet append\nconst item = $input.first();\nconst allInsights = item.json.all_insights || [];\n\nif (allInsights.length === 0) {\n  return [{ json: { message: 'No insights to write' } }];\n}\n\nreturn allInsights.map(insight => ({ json: insight }));"
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          { "node": "Read Raw Data Sheet", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Read Raw Data Sheet": {
+      "main": [
+        [
+          { "node": "Filter Last 24h & Batch", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Filter Last 24h & Batch": {
+      "main": [
+        [
+          { "node": "Loop Over Batches", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Loop Over Batches": {
+      "main": [
+        [
+          { "node": "GPT-4o Analyze Batch", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Aggregate GPT Responses", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "GPT-4o Analyze Batch": {
+      "main": [
+        [
+          { "node": "Wait 2 Seconds", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait 2 Seconds": {
+      "main": [
+        [
+          { "node": "Loop Over Batches", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Aggregate GPT Responses": {
+      "main": [
+        [
+          { "node": "Generate HTML Email", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Generate HTML Email": {
+      "main": [
+        [
+          { "node": "Send Gmail Digest", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Expand Insights for Sheet", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Expand Insights for Sheet": {
+      "main": [
+        [
+          { "node": "Write Insights to Sheet", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "id": "wf-uae-market-intel-analysis-002",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "tags": ["UAE", "Market Intel", "Analysis", "GPT-4o"]
+}
