@@ -1,0 +1,290 @@
+{
+  "name": "UAE Market Intel — Data Collection",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 19,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Reddit via Apify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 160],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/macrocosmos~reddit-scraper/run-sync-get-dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $credentials.queryAuth.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"subreddits\": [\"dubai\", \"UAE\", \"abudhabi\"],\n  \"limit\": 25,\n  \"sort\": \"hot\"\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "apify-query-auth",
+          "name": "Apify Token"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Twitter/X via Apify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/kaitoeasyapi~twitter-x-data-tweet-scraper-pay-per-result-cheapest/run-sync-get-dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $credentials.queryAuth.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"twitterContent\": \"UAE complaints OR Dubai problems OR Abu Dhabi service OR \u0627\u0644\u0625\u0645\u0627\u0631\u0627\u062a \u0634\u0643\u0627\u0648\u0649 OR \u062f\u0628\u064a \u0645\u0634\u0627\u0643\u0644\",\n  \"maxItems\": 50,\n  \"queryType\": \"Latest\"\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "apify-query-auth",
+          "name": "Apify Token"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Tavily News (English)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 440],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"query\": \"UAE market trends consumer complaints business opportunities 2026\",\n  \"search_depth\": \"advanced\",\n  \"max_results\": 10,\n  \"topic\": \"news\",\n  \"country\": \"united arab emirates\",\n  \"time_range\": \"day\"\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tavily-header-auth",
+          "name": "Tavily API Key"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Tavily News (Arabic)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 580],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"query\": \"\u0634\u0643\u0627\u0648\u0649 \u0627\u0644\u0645\u0633\u062a\u0647\u0644\u0643\u064a\u0646 \u0627\u0644\u0625\u0645\u0627\u0631\u0627\u062a \u0641\u0631\u0635 \u062a\u062c\u0627\u0631\u064a\u0629 \u0627\u062a\u062c\u0627\u0647\u0627\u062a \u0627\u0644\u0633\u0648\u0642\",\n  \"search_depth\": \"advanced\",\n  \"max_results\": 10,\n  \"topic\": \"news\",\n  \"country\": \"united arab emirates\",\n  \"time_range\": \"day\"\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tavily-header-auth",
+          "name": "Tavily API Key"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "name": "Merge All Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [800, 370],
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0007-4000-8000-000000000007",
+      "name": "Normalize Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 370],
+      "parameters": {
+        "jsCode": "// Normalize items from different sources into common format\nconst items = $input.all();\nconst normalized = [];\nconst now = new Date().toISOString();\n\nfor (const item of items) {\n  const data = item.json;\n  let row = {};\n\n  // Reddit posts (macrocosmos/reddit-scraper output)\n  if (data.dataType === 'post' || data.communityName || data.subredditName || data.subreddit || data.num_comments !== undefined) {\n    row = {\n      source: 'Reddit',\n      subreddit: data.communityName || data.subredditName || data.subreddit || data.parsedCommunityName || '',\n      title: data.title || '',\n      body: (data.body || data.text || data.selftext || '').substring(0, 2000),\n      author: data.username || data.authorName || data.author || '',\n      score: data.score || data.upVotes || data.upvotes || 0,\n      comments: data.num_comments || data.commentsCount || data.numberOfComments || data.numComments || 0,\n      url: data.url || data.postUrl || '',\n      language: '',\n      collected_at: now\n    };\n  }\n  // Twitter/X posts (kaitoeasyapi scraper output)\n  else if (data.twitterUrl || data.retweetCount !== undefined || data.likeCount !== undefined || data.tweetText) {\n    row = {\n      source: 'X',\n      subreddit: '',\n      title: '',\n      body: (data.text || data.tweetText || '').substring(0, 2000),\n      author: data.author?.userName || data.author?.username || data.username || '',\n      score: data.likeCount || data.likes || 0,\n      comments: data.replyCount || data.replies || 0,\n      url: data.twitterUrl || data.tweetUrl || data.url || '',\n      language: data.lang || '',\n      collected_at: now\n    };\n  }\n  // Tavily news results (top-level results array)\n  else if (data.results) {\n    for (const r of data.results) {\n      normalized.push({\n        json: {\n          source: 'News',\n          subreddit: '',\n          title: r.title || '',\n          body: (r.content || '').substring(0, 2000),\n          author: r.url ? new URL(r.url).hostname : '',\n          score: Math.round((r.score || 0) * 100),\n          comments: 0,\n          url: r.url || '',\n          language: '',\n          collected_at: now\n        }\n      });\n    }\n    continue;\n  }\n  // Tavily individual result item\n  else if (data.title && data.content && data.score !== undefined) {\n    row = {\n      source: 'News',\n      subreddit: '',\n      title: data.title || '',\n      body: (data.content || '').substring(0, 2000),\n      author: data.url ? new URL(data.url).hostname : '',\n      score: Math.round((data.score || 0) * 100),\n      comments: 0,\n      url: data.url || '',\n      language: '',\n      collected_at: now\n    };\n  }\n  else {\n    // Generic fallback\n    row = {\n      source: 'Unknown',\n      subreddit: '',\n      title: data.title || '',\n      body: (data.body || data.text || data.content || JSON.stringify(data)).substring(0, 2000),\n      author: data.author || '',\n      score: 0,\n      comments: 0,\n      url: data.url || '',\n      language: '',\n      collected_at: now\n    };\n  }\n\n  if (Object.keys(row).length > 0) {\n    normalized.push({ json: row });\n  }\n}\n\nreturn normalized;"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0008-4000-8000-000000000008",
+      "name": "Append to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1320, 370],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Raw Data"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            { "id": "source", "displayName": "source", "canBeUsedToMatch": false },
+            { "id": "subreddit", "displayName": "subreddit", "canBeUsedToMatch": false },
+            { "id": "title", "displayName": "title", "canBeUsedToMatch": false },
+            { "id": "body", "displayName": "body", "canBeUsedToMatch": false },
+            { "id": "author", "displayName": "author", "canBeUsedToMatch": false },
+            { "id": "score", "displayName": "score", "canBeUsedToMatch": false },
+            { "id": "comments", "displayName": "comments", "canBeUsedToMatch": false },
+            { "id": "url", "displayName": "url", "canBeUsedToMatch": false },
+            { "id": "language", "displayName": "language", "canBeUsedToMatch": false },
+            { "id": "collected_at", "displayName": "collected_at", "canBeUsedToMatch": false }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          { "node": "Reddit via Apify", "type": "main", "index": 0 },
+          { "node": "Twitter/X via Apify", "type": "main", "index": 0 },
+          { "node": "Tavily News (English)", "type": "main", "index": 0 },
+          { "node": "Tavily News (Arabic)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Reddit via Apify": {
+      "main": [
+        [
+          { "node": "Merge All Sources", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Twitter/X via Apify": {
+      "main": [
+        [
+          { "node": "Merge All Sources", "type": "main", "index": 1 }
+        ]
+      ]
+    },
+    "Tavily News (English)": {
+      "main": [
+        [
+          { "node": "Merge All Sources", "type": "main", "index": 2 }
+        ]
+      ]
+    },
+    "Tavily News (Arabic)": {
+      "main": [
+        [
+          { "node": "Merge All Sources", "type": "main", "index": 3 }
+        ]
+      ]
+    },
+    "Merge All Sources": {
+      "main": [
+        [
+          { "node": "Normalize Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Normalize Data": {
+      "main": [
+        [
+          { "node": "Append to Google Sheets", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "id": "wf-uae-market-intel-collection-001",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "tags": ["UAE", "Market Intel", "Data Collection"]
+}
